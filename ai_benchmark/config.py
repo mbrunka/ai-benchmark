@@ -260,18 +260,6 @@ PIXEL_RNN = Test(
     tests_micro=[]
 )
 
-LSTM_SENTIMENT = Test(
-    test_id=18, test_type="nlp", model="LSTM-Sentiment", model_src="lstm.meta", use_src=True,
-    tests_training=[
-        SubTest(10, [1024, 300], [2], 22, min_passes=5, max_duration=30,
-                loss_function="MSE", optimizer="Adam", learning_rate=1e-4, ref_time=728)
-    ],
-    tests_inference=[
-        SubTest(100, [1024, 300], [2], 22, min_passes=5, max_duration=30, ref_time=547)
-    ],
-    tests_micro=[]
-)
-
 GNMT_TRANSLATION = Test(
     test_id=19, test_type="nlp-text", model="GNMT-Translation", model_src="gnmt.meta", use_src=False,
     tests_training=[],
@@ -299,7 +287,6 @@ BENCHMARK_TESTS = [
     PSPNET,
     DEEPLAB,
     PIXEL_RNN,
-    LSTM_SENTIMENT,
     GNMT_TRANSLATION,
 ]
 

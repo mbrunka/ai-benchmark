@@ -49,7 +49,7 @@ class AIBenchmark:
             self.use_cpu = True
 
     def run(self, precision="normal", test_ids=None, training=True, inference=True, micro=False,
-            cpu_cores=None, inter_threads=None, intra_threads=None):
+            cpu_cores=None, inter_threads=None, intra_threads=None, fixed_iteration_number=None):
         return utils.run_tests(
             training=training,
             inference=inference,
@@ -63,4 +63,5 @@ class AIBenchmark:
             cpu_cores=cpu_cores,
             inter_threads=inter_threads,
             intra_threads=intra_threads,
+            fixed_iteration_number=fixed_iteration_number,
         )

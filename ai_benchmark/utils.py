@@ -252,7 +252,7 @@ def get_model_src(test, testInfo, session):
 def compute_stats(results):
     if len(results) > 1:
         results = results[1:]
-    return np.mean(results), np.std(results)
+    return np.mean(results), np.std(results), np.average(results)
 
 
 def print_test_results(prefix, batch_size, dimensions, mean, std):
@@ -476,6 +476,7 @@ def run_tests(
         cpu_cores=None,
         inter_threads=None,
         intra_threads=None,
+        fixed_iteration_number=None,
     ):
     testInfo = TestInfo(_type, precision, use_cpu, verbose, cpu_cores, inter_threads, intra_threads)
     testInfo.full_suite = (
@@ -489,6 +490,7 @@ def run_tests(
     benchmark_tests = TestConstructor().get_tests(test_ids)
     benchmark_results = BenchmarkResults()
     public_results = PublicResults()
+    all_results = {}  # Dictionary to store all results
     os.chdir(path.dirname(__file__))
 
     iter_multiplier = {
@@ -508,6 +510,9 @@ def run_tests(
         config = None
 
     for test in benchmark_tests:
+
+        test_name = test.model
+        all_results[test_name] = {"inference": {}, "training": {}}  # Initialize test_name entry
 
         if not (micro and len(test.micro) == 0):
             logger.info("\n%s/%s. %s\n", test.id, len(benchmark_tests), test.model)
@@ -536,12 +541,16 @@ def run_tests(
                     time_test_started = get_time_seconds()
                     inference_times = []
 
-                    for i in range(subTest.iterations * iter_multiplier):
+                    # Determine the number of iterations
+                    num_iterations = fixed_iteration_number if fixed_iteration_number is not None else subTest.iterations * iter_multiplier
 
-                        if get_time_seconds() - time_test_started < subTest.max_duration \
-                                or (i < subTest.min_passes and get_time_seconds() - time_test_started < MAX_TEST_DURATION) \
-                                or precision == "high":
-
+                    for i in range(num_iterations):
+                        # Adjust based on min_passes or max_duration if fixed_iteration_number is not set
+                        if fixed_iteration_number != None or (
+                            get_time_seconds() - time_test_started < subTest.max_duration
+                            or (i < subTest.min_passes and get_time_seconds() - time_test_started < MAX_TEST_DURATION)
+                            or precision == "high"
+                        ):
                             data = load_data(test.type, subTest.get_input_dims())
                             time_iter_started = get_time_ms()
                             sess.run(output_, feed_dict={input_: data})
@@ -550,7 +559,12 @@ def run_tests(
 
                             logger.debug("Inference Time: %s ms", inference_time)
 
-                    time_mean, time_std = compute_stats(inference_times)
+                    time_mean, time_std, time_avg = compute_stats(inference_times)
+                    print(time_mean, time_std, time_avg)
+
+                    # Store results in the dictionary
+                    all_results[test_name]["inference"]["iterations"] = inference_times
+                    all_results[test_name]["inference"]["final"] = {"mean": time_mean, "std": time_std, "avg": time_avg}
 
                     public_id = "%d.%d" % (test.id, sub_id)
                     public_results.test_results[public_id] = Result(time_mean, time_std)
@@ -584,12 +598,16 @@ def run_tests(
                     time_test_started = get_time_seconds()
                     training_times = []
 
-                    for i in range(subTest.iterations * iter_multiplier):
+                    # Determine the number of iterations
+                    num_iterations = fixed_iteration_number if fixed_iteration_number is not None else subTest.iterations * iter_multiplier
 
-                        if get_time_seconds() - time_test_started < subTest.max_duration \
-                                or (i < subTest.min_passes and get_time_seconds() - time_test_started < MAX_TEST_DURATION) \
-                                or precision == "high":
-
+                    for i in range(num_iterations):
+                        # Adjust based on min_passes or max_duration if fixed_iteration_number is not set
+                        if fixed_iteration_number != None or (
+                            get_time_seconds() - time_test_started < subTest.max_duration
+                            or (i < subTest.min_passes and get_time_seconds() - time_test_started < MAX_TEST_DURATION)
+                            or precision == "high"
+                        ):
                             data = load_data(test.type, subTest.get_input_dims())
                             target = load_targets(test.type, subTest.get_output_dims())
 
@@ -600,7 +618,11 @@ def run_tests(
 
                             logger.debug("Training Time: %s ms", training_time)
 
-                    time_mean, time_std = compute_stats(training_times)
+                    time_mean, time_std, time_avg = compute_stats(training_times)
+
+                    # Store results in the dictionary
+                    all_results[test_name]["training"]["iterations"] = training_times
+                    all_results[test_name]["training"]["final"] = {"mean": time_mean, "std": time_std, "avg": time_avg}
 
                     public_id = "%d.%d" % (test.id, sub_id)
                     public_results.test_results[public_id] = Result(time_mean, time_std)
@@ -618,4 +640,4 @@ def run_tests(
     public_results = print_scores(testInfo, public_results)
 
     os.chdir(start_dir)
-    return testInfo, public_results
+    return testInfo, public_results, all_results  # Return the dictionary of all results
